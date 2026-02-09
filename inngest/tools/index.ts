@@ -1,5 +1,4 @@
 import { createTool } from "@inngest/agent-kit";
-import z from "zod";
 import { guardRailsSchema, saveFilterResultSchema } from "./schemas";
 
 export const saveFilterResult = createTool({

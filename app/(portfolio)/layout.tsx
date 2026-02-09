@@ -6,6 +6,12 @@ import "../globals.css";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import SidebarToggle from "@/components/sidebar-toggle";
+import { FloatingDock } from "@/components/floating-dock";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ModeToggle } from "@/components/DarkModeToggle";
+import { draftMode } from "next/headers";
+import { DisableDraftMode } from "@/components/DisableDraftMode";
+import { VisualEditing } from "next-sanity/visual-editing"
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -19,25 +25,46 @@ export const metadata: Metadata = {
   description: "Jeremy Okello's Portfolio",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
     <Providers>
-      <html lang="en">
+      <html lang="en" suppressHydrationWarning>
         <body
           className={`${outfit.className} antialiased`}
         >
-          <SidebarProvider>
-            <SidebarInset>
-              {children}
-            </SidebarInset>
-            <AppSidebar side="right" variant="floating" />
-            <SidebarToggle />
-          </SidebarProvider>
-          <SanityLive />
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <SidebarProvider>
+              <SidebarInset>
+                {children}
+              </SidebarInset>
+              <AppSidebar side="right" variant="floating" />
+              <FloatingDock />
+              <SidebarToggle />
+              <div className="fixed md:bottom-6 md:right-24 top-4 right-18 md:top-auto md:left-auto z-0">
+                <div className="w-10 h-10 md:w-12 md:h-12">
+                  <ModeToggle />
+                </div>
+              </div>
+            </SidebarProvider>
+            <SanityLive />
+            {
+              (await draftMode()).isEnabled && (
+                <>
+                  <VisualEditing />
+                  <DisableDraftMode />
+                </>
+              )
+            }
+          </ThemeProvider>
         </body>
       </html>
     </Providers>

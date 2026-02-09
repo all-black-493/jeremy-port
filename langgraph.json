@@ -1,0 +1,7 @@
+{
+    "dependencies":["."],
+    "graphs":{
+        "agent":"./langchain/workflow.ts:workflow"
+    },
+    "env": ".env.local"
+}

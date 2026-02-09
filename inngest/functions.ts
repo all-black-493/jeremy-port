@@ -16,26 +16,16 @@ export const aiTwin = inngest.createFunction(
         console.log("[INPUT ]:", input)
 
         let result
-        try{
-           result = await agentNetwork.run(input)
-        }catch(error){
+
+        try {
+            result = await agentNetwork.run(input)
+        } catch (error) {
             console.log("[ERROR: ]", error)
         }
 
-        console.log("[RESULT ]:", result)
-
-
-        const lastResult = result?.state.results[result?.state.results.length - 1];
-        const output = lastResult?.output;
-
-        console.log("[OUTPUT ]:", output)
-
-        // For text output:
-        const textContent = output?.find(o => o.type === "text")?.content;
-
         return {
             success: true,
-            output: textContent
+            output: result
         }
     }
 )

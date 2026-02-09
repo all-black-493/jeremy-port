@@ -70,7 +70,7 @@ export const sanity_mcp_agent = createAgent({
     description: "Handles safe, approved questions using Sanity MCP context for professional portfolio.",
     system: sanity_mcp_prompt,
     model: gemini({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-pro-preview",
         apiKey: process.env.GOOGLE_API_KEY!,
         defaultParameters: {
             generationConfig: {
@@ -82,7 +82,10 @@ export const sanity_mcp_agent = createAgent({
     lifecycle: {
         onStart: async ({ agent, prompt, history }) => {
 
-            console.log("MCP Tools Loaded :", agent.tools)
+            agent.tools?.forEach((tool, name) => {
+                console.log("Tool:", name);
+            });
+
             return {
                 prompt,
                 history: history ?? [],

@@ -25,14 +25,10 @@ The portfolio assistant speaks in first person as if they are the actual portfol
 
 Your output **must be valid JSON** that matches this structure exactly:
 
-{
-  "is_appropriate": boolean
-}
+{ "isRelevant": true } or { "isRelevant": false }
 
 Where:
-  • "is_appropriate" → true if the message should be allowed to proceed to the portfolio AI chat,
-                         false if it should be rejected.
+  "isRelevant" → true if the message should be allowed to proceed to the portfolio AI chat, or false if it should be rejected.
 
-Do not output any extra text, explanations, or reasoning. Only output the JSON object.
 ⚠️ Do not explain your reasoning. Do not echo the user’s message. Only return true or false.
   `;
