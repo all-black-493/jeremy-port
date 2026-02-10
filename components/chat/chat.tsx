@@ -35,6 +35,7 @@ import {
 
 const client = new Client({
     apiUrl: process.env.NEXT_PUBLIC_BASE_API_URL!,
+    apiKey:process.env.LANGSMITH_API_KEY!,
 });
 
 type ChatBlock =
