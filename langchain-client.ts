@@ -12,5 +12,6 @@ export const llm_instance = new ChatGoogleGenerativeAIEx({
             threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
         },
     ],
+    streaming: true
 })
 

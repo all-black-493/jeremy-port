@@ -33,9 +33,11 @@ import {
     Pencil
 } from "lucide-react"
 
+const PROXY_PATH = "/api/stream/";
+
 const client = new Client({
-    apiUrl: process.env.NEXT_PUBLIC_BASE_API_URL!,
-    apiKey:process.env.LANGSMITH_API_KEY!,
+    // IMPORTANT: Trailing slash is mandatory here
+    apiUrl: typeof window !== "undefined" ? `${window.location.origin}${PROXY_PATH}` : PROXY_PATH,
 });
 
 type ChatBlock =
@@ -377,6 +379,15 @@ function HistoryPanel({
     );
 }
 
+const getProxyUrl = () => {
+    if (typeof window !== "undefined") {
+        // window.location.origin will be "http://localhost:3000" or "https://your-app.com"
+        // The trailing slash is MANDATORY for the SDK to append paths correctly
+        return `${window.location.origin}/api/stream/`;
+    }
+    return "";
+};
+
 
 function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
     const { user } = useUser();
@@ -385,9 +396,10 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const bottomRef = useRef<HTMLDivElement>(null);
     const { toggleSidebar } = useSidebar();
-
+    const proxyUrl = useMemo(() => getProxyUrl(), []);
+    
     const thread = useStream<{ messages: Message[] }>({
-        apiUrl: process.env.NEXT_PUBLIC_BASE_API_URL!,
+        apiUrl: proxyUrl,
         assistantId: "agent",
         messagesKey: "messages",
         reconnectOnMount: true,
