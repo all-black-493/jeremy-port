@@ -21,7 +21,10 @@ const getHeaders = () => ({
     "X-Tenant-Id": process.env.LANGSMITH_WORKSPACE_ID!,
 });
 
-export async function POST(req: NextRequest, { params }: { params: { path?: string[] } }) {
+export async function POST(
+    req: NextRequest,
+    { params }: { params: Promise<{ path?: string[] }> }
+) {
     const { userId } = await auth();
     const { path } = await params
     if (!userId) return new Response("Unauthorized", { status: 401 });
@@ -49,11 +52,16 @@ export async function POST(req: NextRequest, { params }: { params: { path?: stri
     });
 }
 
-export async function GET(req: NextRequest, { params }: { params: { path?: string[] } }) {
+export async function GET(
+    req: NextRequest,
+    { params }: { params: Promise<{ path?: string[] }> }
+) {
     const { userId } = await auth();
+    const { path } = await params
+
     if (!userId) return new Response("Unauthorized", { status: 401 });
 
-    const targetUrl = getRemoteUrl(params.path || [], req.nextUrl.searchParams);
+    const targetUrl = getRemoteUrl(path || [], req.nextUrl.searchParams);
 
     const response = await fetch(targetUrl, {
         method: "GET",
