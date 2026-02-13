@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 export const runtime = "edge";
 
 function getRemoteUrl(pathSegments: string[], searchParams: URLSearchParams) {
-    const baseUrl = process.env.BASE_API_URL!;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_API_URL!;
     const remotePath = pathSegments.join("/");
 
     const absoluteBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
