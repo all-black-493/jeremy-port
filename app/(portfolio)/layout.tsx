@@ -12,6 +12,7 @@ import { ModeToggle } from "@/components/DarkModeToggle";
 import { draftMode } from "next/headers";
 import { DisableDraftMode } from "@/components/DisableDraftMode";
 import { VisualEditing } from "next-sanity/visual-editing"
+import { GoogleAnalytics } from '@next/third-parties/google'
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -66,6 +67,7 @@ export default async function RootLayout({
             }
           </ThemeProvider>
         </body>
+        <GoogleAnalytics gaId="G-7VZM26LEHH" />
       </html>
     </Providers>
   );

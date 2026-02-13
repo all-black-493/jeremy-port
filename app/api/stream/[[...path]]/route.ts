@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 export const runtime = "edge";
 
 function getRemoteUrl(pathSegments: string[], searchParams: URLSearchParams) {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_API_URL!;
+    const baseUrl = process.env.BASE_API_URL!;
     const remotePath = pathSegments.join("/");
 
     const absoluteBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
@@ -25,6 +25,10 @@ export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ path?: string[] }> }
 ) {
+    console.log("STREAM ROUTE HIT");
+    console.log("METHOD:", req.method);
+    console.log("PATH:", await params);
+
     const { userId } = await auth();
     const { path } = await params
     if (!userId) return new Response("Unauthorized", { status: 401 });
@@ -56,6 +60,11 @@ export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ path?: string[] }> }
 ) {
+    console.log("STREAM ROUTE HIT");
+
+    console.log("METHOD:", req.method);
+    console.log("PATH:", await params);
+
     const { userId } = await auth();
     const { path } = await params
 
