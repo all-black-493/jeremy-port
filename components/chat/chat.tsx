@@ -40,15 +40,6 @@ const client = new Client({
     apiUrl: typeof window !== "undefined" ? `${window.location.origin}${PROXY_PATH}` : PROXY_PATH,
 });
 
-type ChatBlock =
-    | { type: "user"; id: string; content: string }
-    | {
-        type: "agent";
-        id: string;
-        content: string;
-        toolCalls: ToolCallGroup[];
-        isStreaming: boolean;
-    };
 
 type ToolCallGroup = {
     id: string;
@@ -59,84 +50,6 @@ type ToolCallGroup = {
 };
 
 
-function groupMessages(messages: Message[]): ChatBlock[] {
-    const blocks: ChatBlock[] = [];
-
-    messages.forEach((msg, i) => {
-        const msgType = msg.type.toLowerCase();
-
-        if (msgType === "human") {
-            blocks.push({
-                type: "user",
-                id: msg.id ?? `msg-${i}`,
-                content: typeof msg.content === "string" ? msg.content : "",
-            });
-        } else if (msgType === "ai") {
-            // 1. ROBUST EXTRACTION: Check all possible locations for tool calls
-            const rawToolCalls =
-                (msg as any).tool_calls ||
-                (msg as any).additional_kwargs?.tool_calls ||
-                (Array.isArray(msg.content) ? msg.content.filter((c: any) => c.type === "tool_call") : []) ||
-                [];
-
-            // Debug log to see which one worked
-            if (rawToolCalls.length > 0) {
-                console.log(`[FOUND TOOLS in AI Message ${i}]:`, rawToolCalls);
-            }
-
-            const toolCallsMap: ToolCallGroup[] = rawToolCalls.map((tc: any) => {
-                // Normalize the ID (Anthropic uses 'id', OpenAI uses 'id', some use 'tool_call_id')
-                const id = tc.id || tc.tool_call_id;
-
-                // Normalize the Name
-                const name = tc.name || tc.function?.name || tc.tool_name || "tool";
-
-                // Normalize Arguments
-                let args = tc.args;
-                if (!args && tc.function?.arguments) {
-                    try {
-                        args = typeof tc.function.arguments === 'string'
-                            ? JSON.parse(tc.function.arguments)
-                            : tc.function.arguments;
-                    } catch (e) {
-                        args = tc.function.arguments;
-                    }
-                } else if (!args && tc.input) {
-                    args = tc.input;
-                }
-
-                const resultMsg = messages.find(
-                    (m) => m.type === "tool" && (m as any).tool_call_id === id
-                );
-
-                let resultString: string | undefined;
-                if (resultMsg) {
-                    resultString = typeof resultMsg.content === "string"
-                        ? resultMsg.content
-                        : JSON.stringify(resultMsg.content, null, 2);
-                }
-
-                return {
-                    id: id,
-                    name: name,
-                    args: args || {},
-                    status: resultMsg ? "completed" : "pending",
-                    result: resultString
-                };
-            });
-
-            blocks.push({
-                type: "agent",
-                id: msg.id ?? `ai-${i}`,
-                content: typeof msg.content === "string" ? msg.content : "",
-                toolCalls: toolCallsMap,
-                isStreaming: false,
-            });
-        }
-    });
-
-    return blocks;
-}
 
 const CodeRenderer = ({ language, value }: { language: string, value: string }) => {
     const [copied, setCopied] = useState(false);
@@ -168,13 +81,6 @@ const CodeRenderer = ({ language, value }: { language: string, value: string }) 
 
 function ToolCard({ tool }: { tool: ToolCallGroup }) {
     const [isOpen, setIsOpen] = useState(tool.status === "pending" || tool.status === "error");
-
-    // useEffect(() => {
-    //     if (tool.status === "completed") {
-    //         const t = setTimeout(() => setIsOpen(false), 2000);
-    //         return () => clearTimeout(t);
-    //     }
-    // }, [tool.status]);
 
     return (
         <div className="mb-2 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden shadow-sm text-xs">
@@ -237,7 +143,9 @@ function MessageActions({ content, onFeedback }: { content: string, onFeedback: 
     );
 }
 
-const AgentMessage = memo(({ block, isLast }: { block: ChatBlock & { type: "agent" }, isLast: boolean }) => {
+const AgentMessage = memo(({ content, isLast }: { content: string, isLast: boolean }) => {
+    if (!content && !isLast) return null;
+
     return (
         <div className="flex items-start gap-3 group mb-6">
             <div className="w-6 h-6 rounded-full border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
@@ -245,43 +153,31 @@ const AgentMessage = memo(({ block, isLast }: { block: ChatBlock & { type: "agen
             </div>
 
             <div className="flex flex-col flex-1 max-w-[90%] min-w-0">
-                {block.toolCalls.length > 0 && (
-                    <div className="mb-2 w-full max-w-md">
-                        {
-                            block.toolCalls.map(
-                                tool => <ToolCard key={tool.id} tool={tool} />
-                            )
-                        }
+                <div className="relative">
+                    <div className="prose prose-sm prose-gray dark:prose-invert max-w-none text-sm leading-relaxed text-gray-800 dark:text-gray-100 inline">
+                        <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                                code({ inline, className, children, ...props }: any) {
+                                    const match = /language-(\w+)/.exec(className || "")
+                                    return !inline && match ? (
+                                        <CodeRenderer language={match[1]} value={String(children).replace(/\n$/, "")} />
+                                    ) : (
+                                        <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-gray-800 dark:text-gray-200 font-mono text-xs border border-gray-200 dark:border-gray-700" {...props}>
+                                            {children}
+                                        </code>
+                                    )
+                                }
+                            }}
+                        >
+                            {content}
+                        </ReactMarkdown>
+                        {isLast && (
+                            <span className="inline-block w-1.5 h-3.75 bg-black dark:bg-white ml-1 animate-[pulse_1s_infinite] vertical-middle" />
+                        )}
                     </div>
-                )}
-
-                {(block.content || isLast) && (
-                    <div className="relative">
-                        <div className="prose prose-sm prose-gray dark:prose-invert max-w-none text-sm leading-relaxed text-gray-800 dark:text-gray-100 inline">
-                            <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
-                                components={{
-                                    code({ node, inline, className, children, ...props }: any) {
-                                        const match = /language-(\w+)/.exec(className || "")
-                                        return !inline && match ? (
-                                            <CodeRenderer language={match[1]} value={String(children).replace(/\n$/, "")} />
-                                        ) : (
-                                            <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-gray-800 dark:text-gray-200 font-mono text-xs border border-gray-200 dark:border-gray-700" {...props}>
-                                                {children}
-                                            </code>
-                                        )
-                                    }
-                                }}
-                            >
-                                {block.content}
-                            </ReactMarkdown>
-                            {isLast && (
-                                <span className="inline-block w-1.5 h-3.75 bg-black dark:bg-white ml-1 animate-[pulse_1s_infinite] vertical-middle" />
-                            )}
-                        </div>
-                        <MessageActions content={block.content} onFeedback={(t) => console.log(t)} />
-                    </div>
-                )}
+                    {content && <MessageActions content={content} onFeedback={(t) => console.log(t)} />}
+                </div>
             </div>
         </div>
     );
@@ -441,14 +337,9 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
 
     const hasMessages = thread.messages && thread.messages.length > 0;
 
-    const chatBlocks = useMemo(() =>
-        groupMessages(messages || []),
-        [messages]
-    );
-
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [chatBlocks.length, thread.isLoading]);
+    }, [messages?.length, thread.isLoading]); // Watch messages.length instead
 
     const handleSubmit = async (text: string) => {
         if (!text.trim()) return;
@@ -554,21 +445,66 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
                     </div>
                 ) : (
                     <div className="space-y-2 pb-4">
-                        {chatBlocks.map((block, index) => {
-                            const isLast = index === chatBlocks.length - 1;
-                            const key = block.id;
-                            if (block.type === "user") {
+                        {/* Replace the chatBlocks.map with this */}
+                        {thread.messages.map((msg, index) => {
+                            const isLast = index === thread.messages.length - 1;
+
+                            // 1. Handle Human Messages
+                            if (msg.type === "human") {
                                 return (
                                     <UserMessage
-                                        key={key}
-                                        content={block.content}
+                                        key={msg.id ?? index}
+                                        content={typeof msg.content === "string" ? msg.content : ""}
                                         userImage={user?.imageUrl}
                                         onEdit={(txt) => setInputValue(txt)}
                                     />
                                 );
-                            } else {
-                                return <AgentMessage key={key} block={block} isLast={isLast && thread.isLoading} />;
                             }
+
+                            if (msg.type === "tool") {
+                                // Attempt to find the tool name from the preceding AI message
+                                const toolCallId = msg.tool_call_id;
+                                const aiMessageWithCall = thread.messages.find(m =>
+                                    m.type === "ai" &&
+                                    m.tool_calls?.some((tc: any) => tc.id === toolCallId)
+                                );
+
+                                const toolName = (aiMessageWithCall as any)?.tool_calls?.find((tc: any) => tc.id === toolCallId)?.name;
+
+                                return (
+                                    <div key={msg.id ?? index} className="flex flex-col items-start gap-3 mb-6 ml-9">
+                                        <ToolCard
+                                            tool={{
+                                                id: toolCallId,
+                                                name: toolName, // Using the found name
+                                                args: "Result only",
+                                                status: "completed",
+                                                result: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content, null, 2)
+                                            }}
+                                        />
+                                    </div>
+                                );
+                            }
+
+                            // 3. Handle AI Messages
+                            if (msg.type === "ai" || (msg as any).type === "model") {
+                                // If the AI message has text, render it. 
+                                // If it's empty but has tool_calls, we can show a "Thinking" state or just skip it 
+                                // because the ToolCard (above) will handle the actual output.
+                                const content = typeof msg.content === "string" ? msg.content : "";
+
+                                if (!content && !isLast) return null; // Hide empty AI transition messages
+
+                                return (
+                                    <AgentMessage
+                                        key={msg.id ?? index}
+                                        content={content}
+                                        isLast={isLast && thread.isLoading}
+                                    />
+                                );
+                            }
+
+                            return null;
                         })}
                         {thread.isLoading && (
                             <div className="flex items-start gap-3 mb-6">
