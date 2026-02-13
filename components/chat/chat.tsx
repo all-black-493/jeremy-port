@@ -1,7 +1,7 @@
 "use client"
 
 import { type CHAT_PROFILE_QUERYResult } from "@/sanity.types"
-import { useStream } from "@langchain/langgraph-sdk/react";
+import { useStream, type UseAgentStream, type ToolCallWithResult } from "@langchain/langgraph-sdk/react";
 import { Client } from "@langchain/langgraph-sdk"
 import type { Message } from "@langchain/langgraph-sdk";
 import { useEffect, useRef, useState, useMemo, memo } from "react";
@@ -54,15 +54,15 @@ type ToolCallGroup = {
     id: string;
     name: string;
     args: any;
-    status: "pending" | "complete" | "error";
+    status: "pending" | "completed" | "error";
     result?: string;
 };
+
 
 function groupMessages(messages: Message[]): ChatBlock[] {
     const blocks: ChatBlock[] = [];
 
-    for (let i = 0; i < messages.length; i++) {
-        const msg = messages[i];
+    messages.forEach((msg, i) => {
         const msgType = msg.type.toLowerCase();
 
         if (msgType === "human") {
@@ -71,60 +71,70 @@ function groupMessages(messages: Message[]): ChatBlock[] {
                 id: msg.id ?? `msg-${i}`,
                 content: typeof msg.content === "string" ? msg.content : "",
             });
-        } else if (msgType === "ai" || msgType === "aimessage") {
-            const content = typeof msg.content === "string" ? msg.content : "";
-            const toolCallsMap: ToolCallGroup[] = [];
-
-            // CHANGED: Added support for camelCase 'toolCalls' and 'additional_kwargs' fallback
+        } else if (msgType === "ai") {
+            // 1. ROBUST EXTRACTION: Check all possible locations for tool calls
             const rawToolCalls =
                 (msg as any).tool_calls ||
-                (msg as any).toolCalls ||
                 (msg as any).additional_kwargs?.tool_calls ||
+                (Array.isArray(msg.content) ? msg.content.filter((c: any) => c.type === "tool_call") : []) ||
                 [];
 
-            rawToolCalls.forEach((tc: any) => {
-                let args = tc.args || tc.function?.arguments;
-                if (typeof args === 'string') {
-                    try { args = JSON.parse(args); } catch (e) { /* partial json */ }
-                }
-
-                toolCallsMap.push({
-                    id: tc.id,
-                    name: tc.name || tc.function?.name,
-                    args: args,
-                    status: "pending"
-                });
-            });
-
-            // Look ahead for "Tool" messages matching these IDs
-            let j = i + 1;
-            while (j < messages.length && (messages[j].type === "tool")) {
-                const toolMsg = messages[j] as any;
-                // CHANGED: Support both snake_case and camelCase for ID matching
-                const toolMsgId = toolMsg.tool_call_id || toolMsg.toolCallId;
-
-                const toolCallIndex = toolCallsMap.findIndex(tc => tc.id === toolMsgId);
-
-                if (toolCallIndex !== -1) {
-                    toolCallsMap[toolCallIndex].status = toolMsg.status === "error" ? "error" : "complete";
-                    // CHANGED: Stringify non-string content (like JSON artifacts)
-                    toolCallsMap[toolCallIndex].result =
-                        typeof toolMsg.content === "string"
-                            ? toolMsg.content
-                            : JSON.stringify(toolMsg.content);
-                }
-                j++;
+            // Debug log to see which one worked
+            if (rawToolCalls.length > 0) {
+                console.log(`[FOUND TOOLS in AI Message ${i}]:`, rawToolCalls);
             }
+
+            const toolCallsMap: ToolCallGroup[] = rawToolCalls.map((tc: any) => {
+                // Normalize the ID (Anthropic uses 'id', OpenAI uses 'id', some use 'tool_call_id')
+                const id = tc.id || tc.tool_call_id;
+
+                // Normalize the Name
+                const name = tc.name || tc.function?.name || tc.tool_name || "tool";
+
+                // Normalize Arguments
+                let args = tc.args;
+                if (!args && tc.function?.arguments) {
+                    try {
+                        args = typeof tc.function.arguments === 'string'
+                            ? JSON.parse(tc.function.arguments)
+                            : tc.function.arguments;
+                    } catch (e) {
+                        args = tc.function.arguments;
+                    }
+                } else if (!args && tc.input) {
+                    args = tc.input;
+                }
+
+                const resultMsg = messages.find(
+                    (m) => m.type === "tool" && (m as any).tool_call_id === id
+                );
+
+                let resultString: string | undefined;
+                if (resultMsg) {
+                    resultString = typeof resultMsg.content === "string"
+                        ? resultMsg.content
+                        : JSON.stringify(resultMsg.content, null, 2);
+                }
+
+                return {
+                    id: id,
+                    name: name,
+                    args: args || {},
+                    status: resultMsg ? "completed" : "pending",
+                    result: resultString
+                };
+            });
 
             blocks.push({
                 type: "agent",
                 id: msg.id ?? `ai-${i}`,
-                content,
+                content: typeof msg.content === "string" ? msg.content : "",
                 toolCalls: toolCallsMap,
-                isStreaming: false
+                isStreaming: false,
             });
         }
-    }
+    });
+
     return blocks;
 }
 
@@ -159,12 +169,12 @@ const CodeRenderer = ({ language, value }: { language: string, value: string }) 
 function ToolCard({ tool }: { tool: ToolCallGroup }) {
     const [isOpen, setIsOpen] = useState(tool.status === "pending" || tool.status === "error");
 
-    useEffect(() => {
-        if (tool.status === "complete") {
-            const t = setTimeout(() => setIsOpen(false), 2000);
-            return () => clearTimeout(t);
-        }
-    }, [tool.status]);
+    // useEffect(() => {
+    //     if (tool.status === "completed") {
+    //         const t = setTimeout(() => setIsOpen(false), 2000);
+    //         return () => clearTimeout(t);
+    //     }
+    // }, [tool.status]);
 
     return (
         <div className="mb-2 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden shadow-sm text-xs">
@@ -173,7 +183,7 @@ function ToolCard({ tool }: { tool: ToolCallGroup }) {
                 className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
             >
                 {tool.status === 'pending' && <Loader2 size={12} className="animate-spin text-blue-500" />}
-                {tool.status === 'complete' && <CheckCircle2 size={12} className="text-green-500" />}
+                {tool.status === 'completed' && <CheckCircle2 size={12} className="text-green-500" />}
                 {tool.status === 'error' && <AlertCircle size={12} className="text-red-500" />}
 
                 <span className="font-medium text-gray-700 dark:text-gray-200 font-mono">{tool.name}</span>
@@ -237,7 +247,11 @@ const AgentMessage = memo(({ block, isLast }: { block: ChatBlock & { type: "agen
             <div className="flex flex-col flex-1 max-w-[90%] min-w-0">
                 {block.toolCalls.length > 0 && (
                     <div className="mb-2 w-full max-w-md">
-                        {block.toolCalls.map(tool => <ToolCard key={tool.id} tool={tool} />)}
+                        {
+                            block.toolCalls.map(
+                                tool => <ToolCard key={tool.id} tool={tool} />
+                            )
+                        }
                     </div>
                 )}
 
@@ -397,7 +411,7 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
     const bottomRef = useRef<HTMLDivElement>(null);
     const { toggleSidebar } = useSidebar();
     const proxyUrl = useMemo(() => getProxyUrl(), []);
-    
+
     const thread = useStream<{ messages: Message[] }>({
         apiUrl: proxyUrl,
         assistantId: "agent",
@@ -408,8 +422,29 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
         onThreadId: setThreadId,
     });
 
+
+    const { messages, isLoading } = thread;
+
+    // console.log(getToolCalls(messages[messages.length - 1]))
+    console.log('[THREAD.MESSAGES:]', thread.messages)
+
+    thread.messages.forEach((msg, index) => {
+        if (msg.type === "ai" && msg.tool_calls! && msg.tool_calls.length > 0) {
+            console.log(`Message ${index} (AI) requested tools:`, msg.tool_calls);
+        }
+
+        // If you want to see the RESULTS (the "tool" type messages):
+        if (msg.type === "tool") {
+            console.log(`Message ${index} (Tool Result) for ID ${msg.tool_call_id}:`, msg.content);
+        }
+    });
+
     const hasMessages = thread.messages && thread.messages.length > 0;
-    const chatBlocks = useMemo(() => groupMessages(thread.messages), [thread.messages]);
+
+    const chatBlocks = useMemo(() =>
+        groupMessages(messages || []),
+        [messages]
+    );
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -428,6 +463,7 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
         thread.submit(
             { messages: [newMessage] },
             {
+                streamMode: ["messages", "values"],
                 optimisticValues(prev) {
                     const prevMessages = prev?.messages ?? [];
                     return { ...prev, messages: [...prevMessages, newMessage] };
@@ -534,6 +570,18 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
                                 return <AgentMessage key={key} block={block} isLast={isLast && thread.isLoading} />;
                             }
                         })}
+                        {thread.isLoading && (
+                            <div className="flex items-start gap-3 mb-6">
+                                <div className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                                    <Bot className="w-3.5 h-3.5 text-gray-500" />
+                                </div>
+
+                                <div className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center gap-2">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                </div>
+                            </div>
+                        )}
+
                         <div ref={bottomRef} className="h-4" />
                     </div>
                 )}
