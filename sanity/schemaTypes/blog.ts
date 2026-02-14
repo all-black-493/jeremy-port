@@ -22,6 +22,15 @@ export default defineType({
             validation: (Rule) => Rule.required(),
         }),
         defineField({
+            name: "blogUrl",
+            title: "Blog URL",
+            type: "url",
+            description: "Optional: If provided, the card will link to this URL (e.g., Medium, Dev.to) instead of the internal blog page.",
+            validation: (Rule) => Rule.uri({
+                scheme: ['http', 'https']
+            })
+        }),
+        defineField({
             name: "excerpt",
             title: "Excerpt",
             type: "text",

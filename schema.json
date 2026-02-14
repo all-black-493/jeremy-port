@@ -807,6 +807,13 @@
         },
         "optional": true
       },
+      "blogUrl": {
+        "type": "objectAttribute",
+        "value": {
+          "type": "string"
+        },
+        "optional": true
+      },
       "excerpt": {
         "type": "objectAttribute",
         "value": {

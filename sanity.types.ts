@@ -148,6 +148,7 @@ export type Blog = {
   _rev: string;
   title?: string;
   slug?: Slug;
+  blogUrl?: string;
   excerpt?: string;
   featuredImage?: {
     asset?: {
@@ -584,10 +585,11 @@ export type ACHIEVEMENTS_QUERYResult = Array<{
 
 // Source: ./components/sections/BlogSection.tsx
 // Variable: BLOG_QUERY
-// Query: *[_type == "blog"] | order(publishedAt desc){  title,  slug,  excerpt,  category,  tags,  publishedAt,  readTime,  featuredImage}
+// Query: *[_type == "blog"] | order(publishedAt desc){  title,  slug,  blogUrl,  excerpt,  category,  tags,  publishedAt,  readTime,  featuredImage}
 export type BLOG_QUERYResult = Array<{
   title: string | null;
   slug: Slug | null;
+  blogUrl: string | null;
   excerpt: string | null;
   category: "ai-ml" | "best-practices" | "career" | "news" | "opinion" | "showcase" | "technical" | "tutorial" | "web-dev" | null;
   tags: Array<string> | null;
@@ -1223,7 +1225,7 @@ declare module "@sanity/client" {
   interface SanityQueries {
     "*[_type == \"navigation\"] | order(order asc){\n  title,\n  href,\n  icon,\n  isExternal\n}": NAVIGATION_QUERYResult;
     "*[_type == \"achievement\"] | order(date desc){\n  title,\n  type,\n  issuer,\n  date,\n  description,\n  image,\n  url,\n  featured,\n  order\n}": ACHIEVEMENTS_QUERYResult;
-    "*[_type == \"blog\"] | order(publishedAt desc){\n  title,\n  slug,\n  excerpt,\n  category,\n  tags,\n  publishedAt,\n  readTime,\n  featuredImage\n}": BLOG_QUERYResult;
+    "*[_type == \"blog\"] | order(publishedAt desc){\n  title,\n  slug,\n  blogUrl,\n  excerpt,\n  category,\n  tags,\n  publishedAt,\n  readTime,\n  featuredImage\n}": BLOG_QUERYResult;
     "*[_id == \"singleton-profile\"][0]{\n  email,\n  phone,\n  location,\n  socialLinks\n}": PROFILE_QUERYResult;
     "*[_type == \"education\"] | order(endDate desc, startDate desc){\n  institution,\n  degree,\n  fieldOfStudy,\n  startDate,\n  endDate,\n  current,\n  gpa,\n  description,\n  achievements,\n  logo,\n  website,\n  order\n}": EDUCATION_QUERYResult;
     "*[_type == \"experience\"] | order(startDate desc){\n  company,\n  position,\n  employmentType,\n  location,\n  startDate,\n  endDate,\n  current,\n  description,\n  responsibilities,\n  achievements,\n  technologies[]->{name, category},\n  companyLogo,\n  companyWebsite\n}": EXPERIENCE_QUERYResult;

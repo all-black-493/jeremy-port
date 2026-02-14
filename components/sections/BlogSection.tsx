@@ -7,6 +7,7 @@ import { sanityFetch } from "@/sanity/lib/live";
 const BLOG_QUERY = defineQuery(`*[_type == "blog"] | order(publishedAt desc){
   title,
   slug,
+  blogUrl,
   excerpt,
   category,
   tags,
@@ -110,12 +111,16 @@ export async function BlogSection() {
                                         </div>
                                     )}
 
-                                    <Link
-                                        href={`/blog/${post.slug?.current}`}
-                                        className="inline-flex items-center text-primary hover:underline text-xs @md/card:text-sm font-medium"
-                                    >
-                                        Read More →
-                                    </Link>
+                                    {post.blogUrl && (
+                                        <Link
+                                            href={post.blogUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center text-primary hover:underline text-xs @md/card:text-sm font-medium"
+                                        >
+                                            Read More →
+                                        </Link>
+                                    )}
                                 </div>
                             </article>
                         ))}
