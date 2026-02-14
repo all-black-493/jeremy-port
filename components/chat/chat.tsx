@@ -1,38 +1,37 @@
 "use client"
 
-import { type CHAT_PROFILE_QUERYResult } from "@/sanity.types"
-import { useStream, type UseAgentStream, type ToolCallWithResult } from "@langchain/langgraph-sdk/react";
-import { Client } from "@langchain/langgraph-sdk"
-import type { Message } from "@langchain/langgraph-sdk";
-import { useEffect, useRef, useState, useMemo, memo } from "react";
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
-import { useSidebar } from "../ui/sidebar";
+import { type CHAT_PROFILE_QUERYResult } from "@/sanity.types";
 import { useUser } from "@clerk/nextjs";
+import type { Message } from "@langchain/langgraph-sdk";
+import { Client } from "@langchain/langgraph-sdk";
+import { useStream } from "@langchain/langgraph-sdk/react";
 import {
-    SendHorizontal,
-    User as UserIcon,
+    AlertCircle,
     Bot,
-    Loader2,
+    CheckCircle2,
     ChevronDown,
     ChevronRight,
-    TerminalSquare,
-    PanelLeft,
-    StopCircle,
-    CheckCircle2,
     Copy,
-    ThumbsUp,
-    ThumbsDown,
-    Plus,
     History,
+    Loader2,
     MessageSquare,
-    X,
-    AlertCircle,
+    PanelLeft,
     Pencil,
-    WifiOff
-} from "lucide-react"
+    Plus,
+    SendHorizontal,
+    StopCircle,
+    TerminalSquare,
+    ThumbsDown,
+    ThumbsUp,
+    User as UserIcon,
+    X
+} from "lucide-react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import remarkGfm from "remark-gfm";
+import { useSidebar } from "../ui/sidebar";
 
 const PROXY_PATH = "/api/stream/";
 
@@ -580,7 +579,6 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
                             </div>
                         )} */}
 
-                        {/* Bottom Loader */}
                         {isLoading && !messages?.[messages.length - 1]?.content && (
                             <div className="flex items-start gap-3 mb-6">
                                 <div className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
