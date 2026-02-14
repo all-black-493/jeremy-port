@@ -19,6 +19,7 @@ import {
     Pencil,
     Plus,
     SendHorizontal,
+    Sparkles,
     StopCircle,
     TerminalSquare,
     ThumbsDown,
@@ -35,8 +36,20 @@ import { useSidebar } from "../ui/sidebar";
 
 const PROXY_PATH = "/api/stream/";
 
+const TECH_JOKES = [
+    "Why do programmers prefer dark mode? Because light attracts bugs.",
+    "I would tell you a UDP joke, but you might not get it.",
+    "There are 10 types of people in the world: those who understand binary, and those who don't.",
+    "My code doesn't work, I have no idea why. My code works, I have no idea why.",
+    "A SQL query walks into a bar, walks up to two tables and asks... 'Can I join you?'",
+    "How many programmers does it take to change a light bulb? None, that's a hardware problem.",
+    "Why was the JavaScript developer sad? Because he didn't know how to 'null' his feelings.",
+    "Debugging: Being the detective in a crime movie where you are also the murderer.",
+    "Why did the edge server go bankrupt? Because it lost its cache.",
+    "Git happened."
+];
+
 const client = new Client({
-    // IMPORTANT: Trailing slash is mandatory here
     apiUrl: typeof window !== "undefined" ? `${window.location.origin}${PROXY_PATH}` : PROXY_PATH,
 });
 
@@ -82,11 +95,32 @@ const CodeRenderer = ({ language, value }: { language: string, value: string }) 
 function ToolCard({ tool }: { tool: ToolCallGroup }) {
     const [isOpen, setIsOpen] = useState(tool.status === "pending" || tool.status === "error");
 
-    // Helper to extract URLs for the "Source" badges
+    // FIXED: Robust URL extraction and validation
     const sources = useMemo(() => {
         if (!tool.result) return [];
+
+        // 1. Capture potential URLs
         const urlRegex = /(https?:\/\/[^\s]+)/g;
-        return Array.from(new Set(tool.result.match(urlRegex)));
+        const matches = tool.result.match(urlRegex);
+
+        if (!matches) return [];
+
+        // 2. Clean and Validate
+        const validUrls = matches.map(url => {
+            // Remove trailing punctuation, quotes, or markdown/html closers
+            return url.replace(/[.,;)"\]>]+$/, "");
+        }).filter(url => {
+            try {
+                // Only keep it if it's a valid URL object
+                new URL(url);
+                return true;
+            } catch {
+                return false;
+            }
+        });
+
+        // 3. Return unique set
+        return Array.from(new Set(validUrls));
     }, [tool.result]);
 
     return (
@@ -103,7 +137,6 @@ function ToolCard({ tool }: { tool: ToolCallGroup }) {
                     {tool.name || "Task"}
                 </span>
 
-                {/* Source Badge Counter */}
                 {sources.length > 0 && (
                     <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded text-[10px] font-bold">
                         {sources.length} {sources.length === 1 ? 'Source' : 'Sources'}
@@ -116,7 +149,6 @@ function ToolCard({ tool }: { tool: ToolCallGroup }) {
 
             {isOpen && (
                 <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-800 font-mono space-y-3">
-                    {/* Input Display */}
                     {tool.args && Object.keys(tool.args).length > 0 && (
                         <div>
                             <div className="text-[10px] text-gray-400 uppercase mb-1">Input</div>
@@ -126,28 +158,32 @@ function ToolCard({ tool }: { tool: ToolCallGroup }) {
                         </div>
                     )}
 
-                    {/* Source Badges */}
                     {sources.length > 0 && (
                         <div>
                             <div className="text-[10px] text-gray-400 uppercase mb-1">References</div>
                             <div className="flex flex-wrap gap-2">
-                                {sources.map((url, i) => (
-                                    <a
-                                        key={i}
-                                        href={url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:border-blue-400 dark:hover:border-blue-500 transition-colors text-blue-600 dark:text-blue-400 no-underline"
-                                    >
-                                        <History size={10} />
-                                        <span className="truncate max-w-37.5">{new URL(url).hostname}</span>
-                                    </a>
-                                ))}
+                                {sources.map((url, i) => {
+                                    // Safe parsing now guaranteed by the filter above
+                                    let hostname = "";
+                                    try { hostname = new URL(url).hostname; } catch { hostname = "Link"; }
+
+                                    return (
+                                        <a
+                                            key={i}
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:border-blue-400 dark:hover:border-blue-500 transition-colors text-blue-600 dark:text-blue-400 no-underline"
+                                        >
+                                            <History size={10} />
+                                            <span className="truncate max-w-37.5">{hostname}</span>
+                                        </a>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
 
-                    {/* Result Display */}
                     {tool.result && (
                         <div>
                             <div className="text-[10px] text-gray-400 uppercase mb-1">Result</div>
@@ -341,6 +377,41 @@ const getProxyUrl = () => {
     return "";
 };
 
+const ThinkingIndicator = () => {
+    const [joke, setJoke] = useState(TECH_JOKES[0]);
+
+    useEffect(() => {
+        setJoke(TECH_JOKES[Math.floor(Math.random() * TECH_JOKES.length)]);
+        const interval = setInterval(() => {
+            setJoke(TECH_JOKES[Math.floor(Math.random() * TECH_JOKES.length)]);
+        }, 3000);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="flex items-start gap-3 mb-6 animate-in fade-in duration-500">
+            <div className="w-6 h-6 rounded-full border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                <Bot className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
+            </div>
+            <div className="flex flex-col gap-2 max-w-[80%]">
+                <div className="bg-gray-100 dark:bg-gray-800 px-4 py-3 rounded-2xl rounded-tl-none w-fit shadow-sm">
+                    <div className="flex items-center gap-1.5 h-2">
+                        <div className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                        <div className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                        <div className="w-1.5 h-1.5 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" />
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 italic ml-1">
+                    <Sparkles size={10} className="text-yellow-500/50" />
+                    <span className="animate-in fade-in slide-in-from-left-1 duration-500">
+                        {joke}
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
     const { user } = useUser();
@@ -362,21 +433,25 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
     });
 
 
-    const { messages, isLoading, error } = thread;
+    const {
+        messages,
+        isLoading,
+        // error 
+    } = thread;
 
     // console.log(getToolCalls(messages[messages.length - 1]))
-    console.log('[THREAD.MESSAGES:]', thread.messages)
+    // console.log('[THREAD.MESSAGES:]', thread.messages)
 
-    thread.messages.forEach((msg, index) => {
-        if (msg.type === "ai" && msg.tool_calls! && msg.tool_calls.length > 0) {
-            console.log(`Message ${index} (AI) requested tools:`, msg.tool_calls);
-        }
+    // thread.messages.forEach((msg, index) => {
+    //     if (msg.type === "tool" && msg.tool_calls! && msg.tool_calls.length > 0) {
+    //         console.log(`Message ${index} (AI) requested tools:`, msg.tool_calls);
+    //     }
 
-        // If you want to see the RESULTS (the "tool" type messages):
-        if (msg.type === "tool") {
-            console.log(`Message ${index} (Tool Result) for ID ${msg.tool_call_id}:`, msg.content);
-        }
-    });
+    //     // If you want to see the RESULTS (the "tool" type messages):
+    //     if (msg.type === "tool") {
+    //         console.log(`Message ${index} (Tool Result) for ID ${msg.tool_call_id}:`, msg.content);
+    //     }
+    // });
 
     const hasMessages = thread.messages && thread.messages.length > 0;
 
@@ -516,9 +591,7 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
                                             />
                                         )}
 
-                                        {/* FIX: Check for tool calls that are REQUESTED by this AI message 
-                        but haven't had a corresponding 'tool' message in the array yet.
-                    */}
+
                                         {msg.tool_calls?.map((tc: any) => {
                                             const hasResult = messages.some(
                                                 m => m.type === "tool" && (m as any).tool_call_id === tc.id
@@ -544,7 +617,6 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
 
                             if (msg.type === "tool") {
                                 const toolCallId = (msg as any).tool_call_id;
-                                // Find the original AI call to get the tool name
                                 const originalCall = messages.find(
                                     m => m.type === "ai" && m.tool_calls?.some((tc: any) => tc.id === toolCallId)
                                 );
@@ -555,7 +627,7 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
                                         <ToolCard
                                             tool={{
                                                 id: toolCallId,
-                                                name: toolName || "Tool Result",
+                                                name: toolName,
                                                 args: {},
                                                 status: "completed",
                                                 result: typeof msg.content === "string"
@@ -579,13 +651,8 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
                             </div>
                         )} */}
 
-                        {isLoading && !messages?.[messages.length - 1]?.content && (
-                            <div className="flex items-start gap-3 mb-6">
-                                <div className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500" />
-                                </div>
-                            </div>
-                        )}
+                        {isLoading && <ThinkingIndicator />}
+
                         <div ref={bottomRef} className="h-4" />
                     </div>
                 )}
