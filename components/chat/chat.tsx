@@ -33,21 +33,11 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import remarkGfm from "remark-gfm";
 import { useSidebar } from "../ui/sidebar";
+import { TECH_JOKES } from "@/constants";
 
 const PROXY_PATH = "/api/stream/";
 
-const TECH_JOKES = [
-    "Why do programmers prefer dark mode? Because light attracts bugs.",
-    "I would tell you a UDP joke, but you might not get it.",
-    "There are 10 types of people in the world: those who understand binary, and those who don't.",
-    "My code doesn't work, I have no idea why. My code works, I have no idea why.",
-    "A SQL query walks into a bar, walks up to two tables and asks... 'Can I join you?'",
-    "How many programmers does it take to change a light bulb? None, that's a hardware problem.",
-    "Why was the JavaScript developer sad? Because he didn't know how to 'null' his feelings.",
-    "Debugging: Being the detective in a crime movie where you are also the murderer.",
-    "Why did the edge server go bankrupt? Because it lost its cache.",
-    "Git happened."
-];
+
 
 const client = new Client({
     apiUrl: typeof window !== "undefined" ? `${window.location.origin}${PROXY_PATH}` : PROXY_PATH,
