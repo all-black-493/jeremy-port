@@ -30,7 +30,8 @@ import {
     MessageSquare,
     X,
     AlertCircle,
-    Pencil
+    Pencil,
+    WifiOff
 } from "lucide-react"
 
 const PROXY_PATH = "/api/stream/";
@@ -82,6 +83,13 @@ const CodeRenderer = ({ language, value }: { language: string, value: string }) 
 function ToolCard({ tool }: { tool: ToolCallGroup }) {
     const [isOpen, setIsOpen] = useState(tool.status === "pending" || tool.status === "error");
 
+    // Helper to extract URLs for the "Source" badges
+    const sources = useMemo(() => {
+        if (!tool.result) return [];
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        return Array.from(new Set(tool.result.match(urlRegex)));
+    }, [tool.result]);
+
     return (
         <div className="mb-2 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden shadow-sm text-xs">
             <button
@@ -92,23 +100,59 @@ function ToolCard({ tool }: { tool: ToolCallGroup }) {
                 {tool.status === 'completed' && <CheckCircle2 size={12} className="text-green-500" />}
                 {tool.status === 'error' && <AlertCircle size={12} className="text-red-500" />}
 
-                <span className="font-medium text-gray-700 dark:text-gray-200 font-mono">{tool.name}</span>
+                <span className="font-medium text-gray-700 dark:text-gray-200 font-mono">
+                    {tool.name || "Task"}
+                </span>
+
+                {/* Source Badge Counter */}
+                {sources.length > 0 && (
+                    <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                        {sources.length} {sources.length === 1 ? 'Source' : 'Sources'}
+                    </span>
+                )}
+
                 <div className="flex-1" />
                 {isOpen ? <ChevronDown size={12} className="text-gray-400" /> : <ChevronRight size={12} className="text-gray-400" />}
             </button>
 
             {isOpen && (
-                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-800 font-mono space-y-2">
-                    <div>
-                        <div className="text-[10px] text-gray-400 uppercase mb-0.5">Input</div>
-                        <div className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-all">
-                            {JSON.stringify(tool.args, null, 2)}
+                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-800 font-mono space-y-3">
+                    {/* Input Display */}
+                    {tool.args && Object.keys(tool.args).length > 0 && (
+                        <div>
+                            <div className="text-[10px] text-gray-400 uppercase mb-1">Input</div>
+                            <pre className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-all bg-white dark:bg-gray-900 p-2 rounded border border-gray-100 dark:border-gray-800">
+                                {JSON.stringify(tool.args, null, 2)}
+                            </pre>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Source Badges */}
+                    {sources.length > 0 && (
+                        <div>
+                            <div className="text-[10px] text-gray-400 uppercase mb-1">References</div>
+                            <div className="flex flex-wrap gap-2">
+                                {sources.map((url, i) => (
+                                    <a
+                                        key={i}
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:border-blue-400 dark:hover:border-blue-500 transition-colors text-blue-600 dark:text-blue-400 no-underline"
+                                    >
+                                        <History size={10} />
+                                        <span className="truncate max-w-37.5">{new URL(url).hostname}</span>
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Result Display */}
                     {tool.result && (
                         <div>
-                            <div className="text-[10px] text-gray-400 uppercase mb-0.5">Result</div>
-                            <div className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                            <div className="text-[10px] text-gray-400 uppercase mb-1">Result</div>
+                            <div className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto bg-white dark:bg-gray-900 p-2 rounded border border-gray-100 dark:border-gray-800">
                                 {tool.result}
                             </div>
                         </div>
@@ -319,7 +363,7 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
     });
 
 
-    const { messages, isLoading } = thread;
+    const { messages, isLoading, error } = thread;
 
     // console.log(getToolCalls(messages[messages.length - 1]))
     console.log('[THREAD.MESSAGES:]', thread.messages)
@@ -340,6 +384,10 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages?.length, thread.isLoading]); // Watch messages.length instead
+
+    const isToolPending = (toolCallId: string) => {
+        return !messages?.some(m => m.type === "tool" && (m as any).tool_call_id === toolCallId);
+    };
 
     const handleSubmit = async (text: string) => {
         if (!text.trim()) return;
@@ -445,15 +493,13 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
                     </div>
                 ) : (
                     <div className="space-y-2 pb-4">
-                        {/* Replace the chatBlocks.map with this */}
-                        {thread.messages.map((msg, index) => {
-                            const isLast = index === thread.messages.length - 1;
+                        {messages?.map((msg, index) => {
+                            const isLast = index === messages.length - 1;
 
-                            // 1. Handle Human Messages
                             if (msg.type === "human") {
                                 return (
                                     <UserMessage
-                                        key={msg.id ?? index}
+                                        key={msg.id ?? `h-${index}`}
                                         content={typeof msg.content === "string" ? msg.content : ""}
                                         userImage={user?.imageUrl}
                                         onEdit={(txt) => setInputValue(txt)}
@@ -461,63 +507,87 @@ function Chat({ profile }: { profile: CHAT_PROFILE_QUERYResult | null }) {
                                 );
                             }
 
-                            if (msg.type === "tool") {
-                                // Attempt to find the tool name from the preceding AI message
-                                const toolCallId = msg.tool_call_id;
-                                const aiMessageWithCall = thread.messages.find(m =>
-                                    m.type === "ai" &&
-                                    m.tool_calls?.some((tc: any) => tc.id === toolCallId)
-                                );
+                            if (msg.type === "ai") {
+                                return (
+                                    <div key={msg.id ?? `ai-${index}`} className="flex flex-col gap-2">
+                                        {msg.content && (
+                                            <AgentMessage
+                                                content={msg.content as string}
+                                                isLast={isLast && isLoading}
+                                            />
+                                        )}
 
-                                const toolName = (aiMessageWithCall as any)?.tool_calls?.find((tc: any) => tc.id === toolCallId)?.name;
+                                        {/* FIX: Check for tool calls that are REQUESTED by this AI message 
+                        but haven't had a corresponding 'tool' message in the array yet.
+                    */}
+                                        {msg.tool_calls?.map((tc: any) => {
+                                            const hasResult = messages.some(
+                                                m => m.type === "tool" && (m as any).tool_call_id === tc.id
+                                            );
+
+                                            if (!hasResult) {
+                                                return (
+                                                    <div key={tc.id} className="ml-9">
+                                                        <ToolCard tool={{
+                                                            id: tc.id,
+                                                            name: tc.name,
+                                                            args: tc.args || {},
+                                                            status: "pending"
+                                                        }} />
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })}
+                                    </div>
+                                );
+                            }
+
+                            if (msg.type === "tool") {
+                                const toolCallId = (msg as any).tool_call_id;
+                                // Find the original AI call to get the tool name
+                                const originalCall = messages.find(
+                                    m => m.type === "ai" && m.tool_calls?.some((tc: any) => tc.id === toolCallId)
+                                );
+                                const toolName = (originalCall as any)?.tool_calls?.find((tc: any) => tc.id === toolCallId)?.name;
 
                                 return (
-                                    <div key={msg.id ?? index} className="flex flex-col items-start gap-3 mb-6 ml-9">
+                                    <div key={msg.id ?? `t-${index}`} className="ml-9 mb-6">
                                         <ToolCard
                                             tool={{
                                                 id: toolCallId,
-                                                name: toolName, // Using the found name
-                                                args: "Result only",
+                                                name: toolName || "Tool Result",
+                                                args: {},
                                                 status: "completed",
-                                                result: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content, null, 2)
+                                                result: typeof msg.content === "string"
+                                                    ? msg.content
+                                                    : JSON.stringify(msg.content, null, 2)
                                             }}
                                         />
                                     </div>
                                 );
                             }
-
-                            // 3. Handle AI Messages
-                            if (msg.type === "ai" || (msg as any).type === "model") {
-                                // If the AI message has text, render it. 
-                                // If it's empty but has tool_calls, we can show a "Thinking" state or just skip it 
-                                // because the ToolCard (above) will handle the actual output.
-                                const content = typeof msg.content === "string" ? msg.content : "";
-
-                                if (!content && !isLast) return null; // Hide empty AI transition messages
-
-                                return (
-                                    <AgentMessage
-                                        key={msg.id ?? index}
-                                        content={content}
-                                        isLast={isLast && thread.isLoading}
-                                    />
-                                );
-                            }
-
                             return null;
                         })}
-                        {thread.isLoading && (
+
+                        {/* {error && (
+                            <div className="flex items-center gap-2 p-3 mb-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 text-xs">
+                                <AlertCircle size={14} />
+                                <span>
+                                    {error instanceof Error ? error.message : typeof error === 'string' ? error : "An unexpected stream error occurred"}
+                                </span>
+                                <button onClick={() => thread.submit(null)} className="ml-auto font-bold underline">Retry</button>
+                            </div>
+                        )} */}
+
+                        {/* Bottom Loader */}
+                        {isLoading && !messages?.[messages.length - 1]?.content && (
                             <div className="flex items-start gap-3 mb-6">
                                 <div className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-                                    <Bot className="w-3.5 h-3.5 text-gray-500" />
-                                </div>
-
-                                <div className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center gap-2">
-                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500" />
                                 </div>
                             </div>
                         )}
-
                         <div ref={bottomRef} className="h-4" />
                     </div>
                 )}
